@@ -589,7 +589,7 @@ if (!is.null(r_polity)) {
   rob_table <- rbind(rob_table, polity_row)
 }
 
-tt(rob_table, notes = sig_note) |>
+tt(rob_table, notes = paste("Driscoll-Kraay row: estimated using Fixed Effects, which absorbs the time-invariant regressors; R-squared is not comparable across estimators and is omitted.", sig_note)) |>
   style_tt(i = 8, bold = TRUE, italic = TRUE) |>   # the separator row
   save_tt(opath("table3_robustness.png"), overwrite = TRUE)
 
