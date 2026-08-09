@@ -916,6 +916,12 @@ colnames(case_table) <- c("Country", "CO2 Intensity", "Residual",
 
 print(case_table)
 
+case_table[["Fossil Exporter"]][is.na(case_table[["Fossil Exporter"]])] <- "-"
+case_table[["Import Dep. (%)"]][is.nan(case_table[["Import Dep. (%)"]])] <- NA
+case_table[["Import Dep. (%)"]] <- ifelse(is.na(case_table[["Import Dep. (%)"]]), "-",
+                                          as.character(case_table[["Import Dep. (%)"]]))
+case_table[["Hydro Dominant"]][case_table$Country == "Bolivia"] <- "Yes"
+
 tt(case_table) |>
   save_tt(opath("morocco_case_candidates.png"), overwrite = TRUE)
 
@@ -992,8 +998,8 @@ print(profile)
 tt(profile) |>
   save_tt(opath("morocco_profile.png"), overwrite = TRUE)
 
-# NOTE: the Morocco location map was produced in QGIS and is not reproduced
-# here. Record that in the README.
+# NOTE: the Morocco location map and the Chapter 2 synthesis map were produced
+# by separate R scripts and are not reproduced here.
 
 # ---- 5.3 Counterfactual analysis -------------------------------------------
 # The counterfactual projects Morocco's pre-war (2015 to 2021) linear trend
@@ -1257,3 +1263,6 @@ print(list.files(out_dir))
 
 
 save.image(file.path(out_dir, "workspace_final_04aug.RData"))
+
+
+
