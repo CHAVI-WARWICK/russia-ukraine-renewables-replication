@@ -12,12 +12,12 @@ FGLS panel analysis and a qualitative case study of Morocco.
 
 | File | Description |
 |---|---|
-| `analysis_full_FINAL.R` | Full replication script. Sections follow the order of the dissertation and reproduce every table and figure. |
+| `workspace_final_frozen.R` | Full replication script. Sections follow the order of the dissertation and reproduce every table and figure. |
 | `panel_data_122_final_v2.csv` | The constructed panel: 122 countries, 1,190 observations, 2015 to 2024. |
 
 ## How to run
 
-1. Open `analysis_full_FINAL.R` in R (built on R 4.5.1).
+1. Open `workspace_final_frozen.R` in R (built on R 4.5.1).
 2. Set the three paths at the top of Section 0 (`data_dir`, `out_dir`, `polity_path`).
 3. Uncomment and run the `install.packages` line once on a fresh machine.
 4. Run top to bottom. All tables and figures are written to the output folder.
