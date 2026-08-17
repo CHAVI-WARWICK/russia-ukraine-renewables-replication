@@ -59,11 +59,11 @@ library(ggrepel)
 library(patchwork)
 
 # ---- Paths: the ONLY lines to change when moving machines ------------------
-data_dir <- "C:/Users/AASHISH ARORA/OneDrive/Desktop/Dissertation/Data"
-out_dir  <- "C:/Users/AASHISH ARORA/OneDrive/Desktop/Dissertation_Duplication/output"
+data_dir    <- "data"
+out_dir     <- "output"
 
 # Polity5 sits outside the main data folder. Give its full path here.
-polity_path <- "C:/Users/AASHISH ARORA/OneDrive/Desktop/Dissertation/final analysis/polity5.xls"
+polity_path <- "data/polity5.xls"
 
 
 # For the GitHub replication repo, replace the three lines above with:
@@ -170,7 +170,8 @@ change_data <- df %>%
   filter(!is.na(pre), !is.na(post)) %>%
   mutate(change = post - pre)
 
-# Headline figure quoted in Chapters 1 and 5: 82 of 122 countries accelerated
+# Headline figure quoted in Chapters 1 and 5: 80 of 119 countries accelerated
+# (countries observable in both periods; Cuba, South Sudan, Yemen lack post-war data)
 cat("Countries that accelerated:", sum(change_data$change > 0),
     "of", nrow(change_data), "\n")
 
@@ -395,7 +396,7 @@ for (i in 1:10) {
   cv_r2[i] <- 1 - (ss_res / ss_tot)
 }
 
-# Expected: mean 0.831, range 0.787 to 0.886
+# Expected: mean 0.831, range 0.786 to 0.886
 cat("CV mean R-squared:", round(mean(cv_r2), 3), "\n")
 print(round(cv_r2, 3))
 
@@ -643,6 +644,7 @@ print(het_table)
 tt(het_table, notes = sig_note) |>
   save_tt(opath("table4_heterogeneity.png"), overwrite = TRUE)
 
+accel_data %>% filter(country %in% fragile) %>% select(country, co2, acceleration)
 
 # ============================================================================
 # 9. CHAPTER 4.9: INTERACTION ANALYSIS BY CARBON INTENSITY (Table 5)
@@ -690,6 +692,22 @@ int_rows <- rbind(int_rows,
 tt(int_rows, notes = sig_note) |>
   save_tt(opath("table5_interaction.png"), overwrite = TRUE)
 
+
+# ---- Robustness: interaction excluding fragile-state outliers --------------
+# The extreme accelerators in Figure 11 are conflict and fragile states with
+# small grids. Same specification, filtered sample.
+fragile <- c("Lebanon", "Djibouti", "Liberia", "West Bank and Gaza")
+
+# First: which lock-in group are they in?
+accel_data %>% filter(country %in% fragile) %>% select(country, co2, acceleration)
+
+pdata_nofragile <- pdata.frame(df %>% filter(!country %in% fragile),
+                               index = c("country", "year"))
+
+m_int_nofragile <- pggls(renewable_pct ~ post_war + co2_high + did_co2 +
+                           covid + hydro_dummy,
+                         data = pdata_nofragile, model = "random")
+print(summary(m_int_nofragile)$CoefTable)
 
 # ============================================================================
 # 10. CHAPTER 4.10: DECOMPOSITION (Table 6, Figure 1)
@@ -924,6 +942,25 @@ case_table[["Hydro Dominant"]][case_table$Country == "Bolivia"] <- "Yes"
 
 tt(case_table) |>
   save_tt(opath("morocco_case_candidates.png"), overwrite = TRUE)
+
+
+# ---- Zones contingency table (Chapter 6) -----------------------------------
+zones <- df %>%
+  group_by(country) %>%
+  summarise(
+    co2 = mean(co2_intensity_avg, na.rm = TRUE),
+    accel = mean(renewable_pct[post_war == 1], na.rm = TRUE) -
+      mean(renewable_pct[post_war == 0], na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    lockin = ifelse(co2 > 518, "High CO2", "Low CO2"),
+    response = ifelse(accel > 0, "Accelerated", "Did not accelerate")
+  )
+
+table(zones$lockin, zones$response)
+sum(table(zones$lockin, zones$response))
+sum(zones$accel > 0)
 
 # ---- Case selection figure -------------------------------------------------
 
@@ -1165,9 +1202,93 @@ ggplot(accel_data, aes(x = co2, y = acceleration)) +
 
 ggsave(opath("co2_vs_acceleration.png"), width = 10, height = 6, dpi = 300)
 
+# ---- Zones contingency table ----------------------------------------------
+# Census behind the two zones: 119 countries observable in both periods,
+# median split at 518 gCO2/kWh, same split as Section 4.9.
+library(gt)
+
+accel_data <- accel_data %>%
+  mutate(lockin = ifelse(co2 > 518, "High CO2", "Low CO2"),
+         response = ifelse(acceleration > 0, "Accelerated", "Did not accelerate"))
+
+table(accel_data$lockin, accel_data$response)   # expect 43/16 and 37/23
+
+zones_tab <- accel_data %>%
+  count(lockin, response) %>%
+  tidyr::pivot_wider(names_from = response, values_from = n) %>%
+  mutate(
+    Total = Accelerated + `Did not accelerate`,
+    `Share accelerating` = paste0(round(100 * Accelerated / Total), "%")
+  ) %>%
+  rename(`Lock-in group` = lockin)
+
+zones_tab <- zones_tab %>%
+  bind_rows(tibble(
+    `Lock-in group` = "Total",
+    Accelerated = sum(zones_tab$Accelerated),
+    `Did not accelerate` = sum(zones_tab$`Did not accelerate`),
+    Total = sum(zones_tab$Total),
+    `Share accelerating` = paste0(round(100 * sum(zones_tab$Accelerated) / sum(zones_tab$Total)), "%")
+  ))
+
+print(zones_tab)
+
+zones_gt <- zones_tab %>%
+  gt() %>%
+  tab_options(
+    table.font.names = "Times New Roman",
+    table.font.size = px(22),
+    table.font.color = "black",
+    data_row.padding = px(14),
+    table_body.hlines.style = "none",
+    column_labels.border.top.width = px(2),
+    column_labels.border.top.color = "black",
+    column_labels.border.bottom.width = px(1),
+    column_labels.border.bottom.style = "solid",
+    table_body.border.bottom.width = px(2),
+    table_body.border.bottom.color = "black",
+    table.border.top.style = "none",
+    table.border.bottom.style = "none"
+  )
+
+gtsave(zones_gt, opath("table_zones.png"), vwidth = 1400)
+
 
 # ============================================================================
-# 14. APPENDIX
+# 15. MOROCCO MAP
+# ============================================================================
+
+# Figure 7: Morocco geographic position (no ggtitle: caption lives in Quarto)
+library(rnaturalearth)
+library(sf)
+library(ggplot2)
+
+map_data <- ne_countries(scale = "medium", returnclass = "sf")
+region   <- subset(map_data, admin %in% c("Morocco", "Algeria", "Spain",
+                                          "Portugal", "Western Sahara",
+                                          "Mauritania", "Tunisia"))
+
+p_map <- ggplot(region) +
+  geom_sf(aes(fill = admin == "Morocco"), colour = "grey70", linewidth = 0.3) +
+  scale_fill_manual(values = c("TRUE" = "#E63946", "FALSE" = "grey92"),
+                    guide = "none") +
+  geom_sf_text(data = subset(region, admin %in% c("Spain", "Algeria")),
+               aes(label = admin), colour = "grey45", size = 3.2) +
+  annotate("text", x = -6.5, y = 32, label = "MOROCCO",
+           colour = "white", fontface = "bold", size = 3.8) +
+  coord_sf(xlim = c(-18, 10), ylim = c(20, 44), expand = FALSE) +
+  labs(caption = paste0(
+    "Morocco imports 93.8% of its energy. Gas pipeline from Algeria cut in ",
+    "November 2021;\nLNG rerouted via Spain from June 2022. Map boundaries ",
+    "follow Natural Earth conventions.\nSource: Natural Earth.")) +
+  theme_void() +
+  theme(plot.caption = element_text(size = 7, hjust = 0.5, colour = "grey30"))
+
+ggsave("C:/Users/AASHISH ARORA/OneDrive/Desktop/Dissertation/Research report artifacts/morocco_map.png",
+       p_map, width = 5, height = 6, dpi = 300, bg = "white")
+
+# ============================================================================
+# 15. APPENDIX
 # ============================================================================
 
 # ---- Table A1: additional control variables --------------------------------
@@ -1262,7 +1383,7 @@ cat("\nComplete. All outputs written to:\n", out_dir, "\n")
 print(list.files(out_dir))
 
 
-save.image(file.path(out_dir, "workspace_final_04aug.RData"))
+save.image(file.path(out_dir, "workspace_final_frozen.RData"))
 
 
 
